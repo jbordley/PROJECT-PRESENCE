@@ -1,0 +1,63 @@
+{
+  "mqtt": {
+    "host": "192.168.1.X",
+    "port": 1883,
+    "client_id_prefix": "sentinel"
+  },
+  "home_name": "home",
+  "owner": "your_name",
+  "zones": {
+    "office": {
+      "name": "office",
+      "nodes": ["node_1"],
+      "adjacent_zones": ["hallway"]
+    }
+  },
+  "nodes": {
+    "node_1": {
+      "node_id": "node_1",
+      "zone": "office",
+      "sensors": ["radar", "acoustic", "voc", "emrf", "lidar"]
+    }
+  },
+  "known_devices": {
+    "person_1": {
+      "name": "Person 1",
+      "devices": [
+        {"mac": "AA:BB:CC:DD:EE:F0", "label": "phone", "type": "wifi"},
+        {"ble_name": "", "label": "phone", "type": "ble"}
+      ]
+    },
+    "person_2": {
+      "name": "Person 2",
+      "devices": [
+        {"mac": "AA:BB:CC:DD:EE:F1", "label": "phone", "type": "wifi"},
+        {"ble_name": "", "label": "phone", "type": "ble"}
+      ]
+    }
+  },
+  "known_infrastructure": {
+    "network": [
+      {"mac": "00:00:00:00:00:01", "label": "Switch", "ip": "192.168.1.X"},
+      {"mac": "00:00:00:00:00:02", "label": "Router", "ip": "192.168.1.X"}
+    ],
+    "media": [
+      {"mac": "00:00:00:00:00:03", "label": "Speaker", "ip": "192.168.1.X"},
+      {"mac": "00:00:00:00:00:04", "label": "Smart TV", "ip": "192.168.1.X"}
+    ],
+    "smart_home": [
+      {"mac": "00:00:00:00:00:05", "label": "Thermostat", "ip": "192.168.1.X"}
+    ],
+    "computers": [
+      {"mac": "00:00:00:00:00:06", "label": "Desktop", "ip": "192.168.1.X"}
+    ],
+    "sentinel": [
+      {"mac": "00:00:00:00:00:07", "label": "Raspberry Pi Hub", "ip": "192.168.1.X"},
+      {"mac": "00:00:00:00:00:08", "label": "Jetson Edge", "ip": "192.168.1.X"},
+      {"mac": "00:00:00:00:00:09", "label": "ESP32-S3 node-01", "ip": "192.168.1.X"}
+    ],
+    "storage": [
+      {"mac": "00:00:00:00:00:0A", "label": "NAS", "ip": "192.168.1.X"}
+    ]
+  }
+}

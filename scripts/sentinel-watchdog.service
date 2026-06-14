@@ -1,0 +1,23 @@
+[Unit]
+Description=Sentinel MQTT Watchdog — monitors ESP32 + adapter health
+After=network-online.target mosquitto.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<user>
+WorkingDirectory=/home/<user>/Presence
+EnvironmentFile=/home/<user>/Presence/.env
+ExecStart=/usr/bin/python3 -m sentinel.watchdog
+
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sentinel-watchdog
+
+[Install]
+WantedBy=multi-user.target

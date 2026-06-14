@@ -1,0 +1,32 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+*.zip
+*.png
+node_modules/
+.DS_Store
+
+# --- Sensitive config (real MACs, names, IPs, credentials) ---
+sentinel_config.json
+sentinel_node/config.h
+sentinel_node/config_node01.h
+sentinel_node/config_node02.h
+sentinel_node/config_node03.h
+sentinel_node/config_node04.h
+sentinel_node/config_node01_c6.h
+sentinel_node/config_node02_c6.h
+sentinel_node/config_node03_c6.h
+sentinel_node/config_node04_c6.h
+.env
+*.secret
+
+# --- Session notes (contain PII, not needed in public repo) ---
+session_synopsis_*.md
+session-handoff-*.md
+
+# --- Face crops for identity enrollment (PII - face images) ---
+face_crops/
+/var/lib/sentinel/face_crops/

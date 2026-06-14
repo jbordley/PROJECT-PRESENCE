@@ -1,0 +1,34 @@
+[Unit]
+Description=Project Presence — CSI Aggregator Bridge
+Documentation=https://github.com/jbordley/PROJECT-PRESENCE
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<user>
+Group=<user>
+WorkingDirectory=/home/<user>/Presence/bridge
+EnvironmentFile=/home/<user>/Presence/.env
+ExecStart=/usr/bin/python3 /home/<user>/Presence/bridge/csi_bridge.py \
+    --port 5005 \
+    --mqtt-host ${MQTT_HOST} \
+    --mqtt-port ${MQTT_PORT} \
+    --log-level ${LOG_LEVEL}
+
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=csi-bridge
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadOnlyPaths=/home/<user>/Presence
+ReadWritePaths=/var/lib/sentinel
+
+[Install]
+WantedBy=multi-user.target

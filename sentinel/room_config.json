@@ -1,0 +1,57 @@
+{
+  "_doc": "EXAMPLE LiDAR sector-to-room mapping. Replace with values from your own calibration walk-around. All geometry below is synthetic sample data.",
+  "_version": "1.0",
+  "_node": "node-01",
+  "_zone": "office",
+  "_lidar": "YDLiDAR X4 Pro",
+  "_placement": "Example: LiDAR beside the desk, motor facing the primary seat",
+  "_orientation": "S0 (0°) faces the primary seat. Sectors increase clockwise from above.",
+  "_calibrated": "YYYY-MM-DD",
+
+  "sectors": {
+    "S0":  { "angle_start": 0,   "angle_end": 30,  "label": "seat_a",      "baseline_mm": 900,  "type": "seat",      "notes": "Primary seat" },
+    "S1":  { "angle_start": 30,  "angle_end": 60,  "label": "desk_left",   "baseline_mm": 900,  "type": "furniture", "notes": "Desk edge / torso" },
+    "S2":  { "angle_start": 60,  "angle_end": 90,  "label": "wall_a",      "baseline_mm": 600,  "type": "wall",      "notes": "Close wall — always blocked" },
+    "S3":  { "angle_start": 90,  "angle_end": 120, "label": "wall_b",      "baseline_mm": 1600, "type": "wall",      "notes": "Side wall" },
+    "S4":  { "angle_start": 120, "angle_end": 150, "label": "wall_c",      "baseline_mm": 800,  "type": "wall",      "notes": "Corner wall" },
+    "S5":  { "angle_start": 150, "angle_end": 180, "label": "wall_d",      "baseline_mm": 1700, "baseline_alt_mm": 1412, "type": "wall",      "notes": "Far wall — oscillates with furniture edge; widen tolerance or ignore for presence" },
+    "S6":  { "angle_start": 180, "angle_end": 210, "label": "wall_e",      "baseline_mm": 750,  "type": "wall",      "notes": "Wall directly behind LiDAR" },
+    "S7":  { "angle_start": 210, "angle_end": 240, "label": "wall_f",      "baseline_mm": 850,  "type": "wall",      "notes": "Corner behind desk" },
+    "S8":  { "angle_start": 240, "angle_end": 270, "label": "seat_b",      "baseline_mm": 1050, "type": "seat",      "notes": "Secondary seat" },
+    "S9":  { "angle_start": 270, "angle_end": 300, "label": "doorway_a",   "baseline_mm": null, "type": "opening",   "notes": "Open doorway — deep open space" },
+    "S10": { "angle_start": 300, "angle_end": 330, "label": "doorway_b",   "baseline_mm": 5600, "type": "opening",   "notes": "Hallway / entry — rarely triggers" },
+    "S11": { "angle_start": 330, "angle_end": 360, "label": "walkway",     "baseline_mm": 2600, "type": "traffic",   "notes": "Main walking path — high variability" }
+  },
+
+  "detection_rules": {
+    "_doc": "Rules for interpreting sector changes relative to baseline",
+    "presence_threshold_pct": 30,
+    "presence_threshold_mm": 300,
+    "traffic_sectors": ["S9", "S10", "S11"],
+    "seat_sectors": { "S0": "person_1", "S8": "person_2" },
+    "wall_sectors": ["S2", "S3", "S4", "S5", "S6", "S7"],
+    "ignore_sectors": ["S2"],
+    "seated_detection": {
+      "_doc": "If a seat sector reading drops significantly from baseline, that person is seated",
+      "person_1": { "sector": "S0", "baseline_mm": 900,  "occupied_range_mm": [300, 1000] },
+      "person_2": { "sector": "S8", "baseline_mm": 1050, "occupied_range_mm": [400, 1100] }
+    },
+    "movement_detection": {
+      "_doc": "Large baseline change in traffic sectors = someone walking through",
+      "sectors": ["S9", "S10", "S11"],
+      "min_change_mm": 500,
+      "direction_inference": {
+        "toward_zone_a": ["S11 drops", "S3 drops after"],
+        "toward_zone_b": ["S11 drops", "S9 appears"],
+        "entering_office": ["S9 or S10 newly appears", "S11 drops"]
+      }
+    }
+  },
+
+  "adjacent_zones": {
+    "zone_a":     { "via_sectors": ["S3", "S4"],         "direction": "west" },
+    "zone_b":     { "via_sectors": ["S9", "S10"],        "direction": "east-south" },
+    "entry":      { "via_sectors": ["S10"],              "direction": "south" },
+    "hallway":    { "via_sectors": ["S9", "S10", "S11"], "direction": "south-east" }
+  }
+}

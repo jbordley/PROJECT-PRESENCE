@@ -1,0 +1,26 @@
+[Unit]
+Description=SENTINEL Camera Adapter — Arducam + TC001 thermal to MQTT
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<user>
+WorkingDirectory=/home/<user>/Presence
+EnvironmentFile=/home/<user>/Presence/.env
+ExecStart=/usr/bin/python3 -m sentinel.adapters.camera_adapter \
+    --mqtt-host ${MQTT_HOST} --zone ${CAMERA_ZONE} \
+    --thermal-device ${THERMAL_DEVICE} --thermal-crop ${THERMAL_CROP} \
+    --snapshot-port ${SNAPSHOT_PORT} --log-level ${LOG_LEVEL}
+Restart=always
+RestartSec=5
+MemoryMax=512M
+CPUQuota=50%
+ProtectSystem=strict
+ReadWritePaths=/home/<user>/Presence /home/<user>/sentinel
+SupplementaryGroups=video
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

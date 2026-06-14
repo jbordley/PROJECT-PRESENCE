@@ -1,0 +1,25 @@
+[Unit]
+Description=SENTINEL Fusion — Three-layer validation + sensor fusion
+After=network-online.target
+Wants=network-online.target sentinel-node-adapter.service
+
+[Service]
+Type=simple
+User=<user>
+WorkingDirectory=/home/<user>/Presence
+EnvironmentFile=/home/<user>/Presence/.env
+ExecStart=/usr/bin/python3 -m sentinel.fusion \
+    --mqtt-host ${MQTT_HOST} --log-level ${LOG_LEVEL}
+Restart=always
+RestartSec=5
+MemoryMax=256M
+CPUQuota=25%
+
+# Hardening
+ProtectSystem=strict
+ReadWritePaths=/home/<user>/Presence /home/<user>/sentinel
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

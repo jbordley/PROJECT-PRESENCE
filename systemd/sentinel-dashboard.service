@@ -1,0 +1,25 @@
+[Unit]
+Description=SENTINEL Dashboard — Real-time sensor monitoring UI
+After=network-online.target
+Wants=network-online.target sentinel-fusion.service
+
+[Service]
+Type=simple
+User=<user>
+WorkingDirectory=/home/<user>/Presence
+EnvironmentFile=/home/<user>/Presence/.env
+ExecStart=/usr/bin/python3 -m sentinel.dashboard \
+    --mqtt-host ${MQTT_HOST} --port ${DASHBOARD_PORT} --log-level ${LOG_LEVEL}
+Restart=always
+RestartSec=5
+MemoryMax=256M
+CPUQuota=15%
+
+# Hardening
+ProtectSystem=strict
+ReadWritePaths=/home/<user>/Presence /home/<user>/sentinel
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sentinel — Dashboard</title>
+<style>
+  :root {
+    --bg: #0a0e17;
+    --surface: #111827;
+    --surface2: #1a2332;
+    --border: #1e2d3d;
+    --text: #e2e8f0;
+    --text-dim: #64748b;
+    --accent: #3b82f6;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --cyan: #06b6d4;
+    --purple: #a855f7;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Header ─────────────────────────────────────────────── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .header .status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 4px;
+  }
+  .status-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-dot.disconnected { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+  /* ── Grid Layout ────────────────────────────────────────── */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 12px;
+    height: calc(100vh - 50px);
+  }
+
+  #panel-floorplan {
+    grid-row: 1 / -1;
+    display: flex;
+    flex-direction: column;
+  }
+  #panel-floorplan .floorplan-wrap { flex: 1; }
+
+  .right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    max-height: calc(100vh - 74px);
+  }
+  .right-col .panel { flex-shrink: 0; }
+
+  /* ── Panel ──────────────────────────────────────────────── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .panel-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+  }
+
+  .panel-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .badge-live { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-stale { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .badge-offline { background: rgba(239,68,68,0.15); color: var(--red); }
+
+  .panel-body {
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.6;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  /* ── Key-Value Rows ─────────────────────────────────────── */
+  .kv-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+  .kv-key { color: var(--text-dim); font-size: 12px; }
+  .kv-val { color: var(--text); font-size: 13px; font-weight: 500; }
+  .kv-val.highlight { color: var(--cyan); }
+
+  /* ── Radar Targets ──────────────────────────────────────── */
+  .radar-canvas {
+    width: 100%;
+    height: 200px;
+    position: relative;
+    background: radial-gradient(circle at 50% 100%, rgba(59,130,246,0.06) 0%, transparent 70%);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .radar-target {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent);
+    transform: translate(-50%, -50%);
+    transition: all 0.3s ease;
+  }
+
+  .radar-label {
+    position: absolute;
+    font-size: 10px;
+    color: var(--text-dim);
+    transform: translate(-50%, 10px);
+    white-space: nowrap;
+  }
+
+  /* ── Narrative ──────────────────────────────────────────── */
+  .narrative-text {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    padding: 4px 0;
+  }
+
+  .narrative-text .empty {
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  /* ── Activity Log ───────────────────────────────────────── */
+  .log-entry {
+    font-size: 11px;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+    display: flex;
+    gap: 8px;
+  }
+  .log-time { color: var(--text-dim); flex-shrink: 0; }
+  .log-topic { color: var(--purple); flex-shrink: 0; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+  .log-data { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── Thermal Heatmap ───────────────────────────────────── */
+  .thermal-snapshot {
+    width: 100%;
+    height: 160px;
+    position: relative;
+    background: #0d0d0d;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .thermal-snapshot img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  /* ── Camera Snapshot ──────────────────────────────────── */
+  .camera-snapshot {
+    width: 100%;
+    height: 180px;
+    position: relative;
+    background: #0d0d0d;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .camera-snapshot img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .snapshot-placeholder {
+    color: var(--text-dim);
+    font-size: 11px;
+    font-style: italic;
+  }
+
+  /* ── Floorplan Canvas ──────────────────────────────────── */
+  .floorplan-wrap {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 500px;
+  }
+  .floorplan-wrap canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ── Scrollbar ──────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── Responsive ─────────────────────────────────────────── */
+  @media (max-width: 768px) {
+    .grid { grid-template-columns: 1fr; height: auto; }
+    #panel-floorplan { grid-row: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Sentinel</h1>
+  <div class="status">
+    <span><span class="status-dot disconnected" id="ws-dot"></span> <span id="ws-status">Connecting...</span></span>
+    <span id="msg-rate">0 msg/s</span>
+    <span id="uptime"></span>
+  </div>
+</div>
+
+<div class="grid">
+
+  <!-- Floorplan Panel -->
+  <div class="panel" id="panel-floorplan">
+    <div class="panel-header">
+      <span class="panel-title">Floorplan</span>
+      <span class="panel-badge badge-live" id="floorplan-badge">Live</span>
+    </div>
+    <div class="floorplan-wrap">
+      <canvas id="floorplan-canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- Right Column: scrollable stack -->
+  <div class="right-col">
+
+  <!-- 1. EMRF Intelligence Panel -->
+  <div class="panel" id="panel-emrf">
+    <div class="panel-header">
+      <span class="panel-title">EMRF Intelligence — Office</span>
+      <span class="panel-badge badge-offline" id="emrf-badge">Waiting</span>
+    </div>
+    <div class="panel-body" id="emrf-data" style="max-height:500px;">
+      <div class="kv-row"><span class="kv-key">Scan #</span><span class="kv-val" id="emrf-scan">—</span></div>
+      <div class="kv-row"><span class="kv-key">Present / Tracked</span><span class="kv-val highlight" id="emrf-tracked">—</span></div>
+      <div class="kv-row"><span class="kv-key">People Devices</span><span class="kv-val highlight" id="emrf-known">—</span></div>
+      <div class="kv-row"><span class="kv-key">Infrastructure</span><span class="kv-val" id="emrf-infra" style="color:var(--amber);">—</span></div>
+      <div class="kv-row"><span class="kv-key">Unknown</span><span class="kv-val" id="emrf-unknown" style="color:var(--red);">—</span></div>
+
+      <!-- Per-person presence with proximity -->
+      <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:4px;">People Presence</div>
+        <div id="emrf-persons"></div>
+      </div>
+
+      <!-- Unknown devices with threat + vendor -->
+      <div id="emrf-unknowns-section" style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px;display:none;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--red);margin-bottom:4px;">Unknown Devices</div>
+        <div id="emrf-unknowns"></div>
+      </div>
+
+      <!-- Infrastructure summary -->
+      <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:4px;">Infrastructure</div>
+        <div id="emrf-infrastructure"></div>
+      </div>
+
+      <!-- Intelligence narrative -->
+      <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--cyan);margin-bottom:4px;">Intelligence</div>
+        <div id="emrf-intelligence" style="font-size:12px;color:var(--text);line-height:1.5;font-family:'Inter',-apple-system,sans-serif;"></div>
+      </div>
+
+      <!-- Recent events -->
+      <div id="emrf-events-section" style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px;display:none;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:4px;">Recent Events</div>
+        <div id="emrf-events"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Thermal Panel -->
+  <div class="panel" id="panel-thermal">
+    <div class="panel-header">
+      <span class="panel-title">Thermal — Office</span>
+      <span class="panel-badge badge-offline" id="thermal-badge">Waiting</span>
+    </div>
+    <div class="thermal-snapshot" id="thermal-snapshot">
+      <span class="snapshot-placeholder">Thermal feed will appear when camera adapter is running.</span>
+    </div>
+    <div class="panel-body" id="thermal-data">
+      <div class="kv-row"><span class="kv-key">Max Temp</span><span class="kv-val highlight" id="thermal-max">—</span></div>
+      <div class="kv-row"><span class="kv-key">Min Temp</span><span class="kv-val" id="thermal-min">—</span></div>
+      <div class="kv-row"><span class="kv-key">Mean Temp</span><span class="kv-val" id="thermal-mean">—</span></div>
+      <div class="kv-row"><span class="kv-key">Human Blobs</span><span class="kv-val highlight" id="thermal-blobs">—</span></div>
+      <div class="kv-row"><span class="kv-key">Hot Spots</span><span class="kv-val" id="thermal-hotspots">—</span></div>
+    </div>
+  </div>
+
+  <!-- 3. Camera Panel (Video) -->
+  <div class="panel" id="panel-camera">
+    <div class="panel-header">
+      <span class="panel-title">Camera — Office</span>
+      <span class="panel-badge badge-offline" id="camera-badge">Waiting</span>
+    </div>
+    <div class="camera-snapshot" id="camera-snapshot">
+      <span class="snapshot-placeholder">Camera feed will appear when camera adapter is running.</span>
+    </div>
+    <div class="panel-body" id="camera-data">
+      <div class="kv-row"><span class="kv-key">Faces Detected</span><span class="kv-val highlight" id="camera-faces">—</span></div>
+      <div class="kv-row"><span class="kv-key">Persons</span><span class="kv-val highlight" id="camera-persons">—</span></div>
+      <div class="kv-row"><span class="kv-key">Confidence</span><span class="kv-val" id="camera-confidence">—</span></div>
+    </div>
+  </div>
+
+  <!-- 4. Acoustic Panel -->
+  <div class="panel" id="panel-acoustic">
+    <div class="panel-header">
+      <span class="panel-title">Acoustic — Office</span>
+      <span class="panel-badge badge-offline" id="acoustic-badge">Waiting</span>
+    </div>
+    <div class="panel-body" id="acoustic-data">
+      <div class="kv-row"><span class="kv-key">RMS Level</span><span class="kv-val" id="acoustic-rms">—</span></div>
+      <div class="kv-row"><span class="kv-key">Peak Level</span><span class="kv-val" id="acoustic-peak">—</span></div>
+      <div class="kv-row"><span class="kv-key">Impulsive</span><span class="kv-val" id="acoustic-impulsive">—</span></div>
+    </div>
+  </div>
+
+  <!-- 5. Environment Panel -->
+  <div class="panel" id="panel-voc">
+    <div class="panel-header">
+      <span class="panel-title">Environment — Office</span>
+      <span class="panel-badge badge-offline" id="voc-badge">Waiting</span>
+    </div>
+    <div class="panel-body" id="voc-data">
+      <div class="kv-row"><span class="kv-key">Temperature</span><span class="kv-val highlight" id="voc-temp">—</span></div>
+      <div class="kv-row"><span class="kv-key">Humidity</span><span class="kv-val highlight" id="voc-humidity">—</span></div>
+      <div class="kv-row"><span class="kv-key">Pressure</span><span class="kv-val" id="voc-pressure">—</span></div>
+      <div class="kv-row"><span class="kv-key">Gas Resistance</span><span class="kv-val" id="voc-gas">—</span></div>
+      <div class="kv-row"><span class="kv-key">Air Quality</span><span class="kv-val" id="voc-aq">—</span></div>
+      <div class="kv-row" id="voc-warmup-row" style="display:none"><span class="kv-key">Status</span><span class="kv-val" id="voc-warmup" style="color:#f59e0b">Sensor warming up</span></div>
+    </div>
+  </div>
+
+  <!-- 6. Radar Panel -->
+  <div class="panel" id="panel-radar">
+    <div class="panel-header">
+      <span class="panel-title">Radar — Office</span>
+      <span class="panel-badge badge-offline" id="radar-badge">Waiting</span>
+    </div>
+    <div class="radar-canvas" id="radar-canvas"></div>
+    <div class="panel-body" id="radar-data">
+      <div class="kv-row"><span class="kv-key">Targets</span><span class="kv-val" id="radar-targets">—</span></div>
+      <div class="kv-row"><span class="kv-key">Confidence</span><span class="kv-val" id="radar-confidence">—</span></div>
+      <div class="kv-row"><span class="kv-key">Update Rate</span><span class="kv-val" id="radar-rate">—</span></div>
+    </div>
+  </div>
+
+  <!-- 7. Node Health Panel -->
+  <div class="panel" id="panel-health">
+    <div class="panel-header">
+      <span class="panel-title">Node Health</span>
+      <span class="panel-badge badge-offline" id="health-badge">Waiting</span>
+    </div>
+    <div class="panel-body" id="health-data">
+      <div class="kv-row"><span class="kv-key">Node</span><span class="kv-val" id="health-node">—</span></div>
+      <div class="kv-row"><span class="kv-key">Uptime</span><span class="kv-val" id="health-uptime">—</span></div>
+      <div class="kv-row"><span class="kv-key">Heap Free</span><span class="kv-val" id="health-heap">—</span></div>
+      <div class="kv-row"><span class="kv-key">WiFi RSSI</span><span class="kv-val" id="health-rssi">—</span></div>
+      <div class="kv-row"><span class="kv-key">MQTT Reconnects</span><span class="kv-val" id="health-reconn">—</span></div>
+    </div>
+  </div>
+
+  <!-- Narrative (hidden) -->
+  <div class="panel" id="panel-narrative" style="display:none;">
+    <div class="panel-header">
+      <span class="panel-title">Narrative</span>
+      <span class="panel-badge badge-offline" id="narrative-badge">Waiting for Brain</span>
+    </div>
+    <div class="panel-body">
+      <div class="narrative-text" id="narrative-text">
+        <span class="empty">Narrative will appear here when the brain service is running.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zone Occupancy (hidden) -->
+  <div class="panel" id="panel-context" style="display:none;">
+    <div class="panel-header">
+      <span class="panel-title">Zone Occupancy</span>
+      <span class="panel-badge badge-offline" id="context-badge">Waiting for Fusion</span>
+    </div>
+    <div class="panel-body" id="context-data">
+      <div class="kv-row"><span class="kv-key">Office</span><span class="kv-val" id="occ-office">—</span></div>
+      <div class="kv-row"><span class="kv-key">Hallway</span><span class="kv-val" id="occ-hallway">—</span></div>
+      <div class="kv-row"><span class="kv-key">Entry</span><span class="kv-val" id="occ-entry">—</span></div>
+      <div class="kv-row"><span class="kv-key">Bedroom</span><span class="kv-val" id="occ-bedroom">—</span></div>
+      <div class="kv-row"><span class="kv-key">Kitchen</span><span class="kv-val" id="occ-kitchen">—</span></div>
+      <div class="kv-row"><span class="kv-key">Living Room</span><span class="kv-val" id="occ-living_room">—</span></div>
+      <div class="kv-row"><span class="kv-key">Bathroom</span><span class="kv-val" id="occ-bathroom">—</span></div>
+    </div>
+  </div>
+
+  </div><!-- end right-col -->
+
+  <!-- Activity Log (hidden) -->
+  <div class="panel" id="panel-log" style="display:none;">
+    <div class="panel-header">
+      <span class="panel-title">Activity Log</span>
+      <span class="panel-badge badge-offline" id="log-badge">0 messages</span>
+    </div>
+    <div class="panel-body" id="log-body" style="max-height: 200px;"></div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── State ──────────────────────────────────────────────────────
+  let ws = null;
+  let msgCount = 0;
+  let msgCountWindow = [];
+  const RATE_WINDOW = 5000; // 5 seconds for rate calc
+  const STALE_MS = 15000;   // 15s = stale
+  const lastSeen = {};       // topic → timestamp
+
+  // ── WebSocket ──────────────────────────────────────────────────
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+    ws.onopen = () => {
+      document.getElementById('ws-dot').className = 'status-dot connected';
+      document.getElementById('ws-status').textContent = 'Connected';
+    };
+
+    ws.onclose = () => {
+      document.getElementById('ws-dot').className = 'status-dot disconnected';
+      document.getElementById('ws-status').textContent = 'Reconnecting...';
+      setTimeout(connect, 2000);
+    };
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+
+      // Handle state cache (bulk initial state)
+      if (msg.type === 'state_cache') {
+        for (const [topic, cached] of Object.entries(msg.data)) {
+          handleMessage(cached);
+        }
+        return;
+      }
+
+      handleMessage(msg);
+    };
+  }
+
+  function handleMessage(msg) {
+    msgCount++;
+    msgCountWindow.push(Date.now());
+
+    const topic = msg.topic || '';
+    const data = msg.data;
+    const layer = msg.layer || classifyLayer(topic);
+
+    lastSeen[topic] = Date.now();
+
+    // Route to handler — floorplan gets ALL radar + occupancy
+    if (topic.includes('/radar/raw'))      fpUpdateRadar(topic, data);
+    if (topic.includes('/occupancy'))      fpUpdateOccupancy(topic, data);
+
+    if (topic.includes('/radar/raw'))       updateRadar(data);
+    else if (topic.includes('/voc/raw'))    updateVoc(data);
+    else if (topic.includes('/emrf/raw'))   updateEmrf(data);
+    else if (topic.includes('/acoustic/raw')) updateAcoustic(data);
+    else if (topic.includes('/thermal/raw')) updateThermal(data);
+    else if (topic.includes('/camera/raw')) updateCamera(data);
+    else if (topic.includes('/health'))     updateHealth(data, topic);
+    else if (topic.includes('/narrative'))  updateNarrative(data);
+    else if (topic.includes('/occupancy'))  updateOccupancy(data, topic);
+    else if (topic.includes('/brain/status')) updateBrainStatus(data);
+    else if (topic.includes('/emrf/arrival') || topic.includes('/emrf/departure') || topic.includes('/emrf/new_device'))
+      addEmrfEvent(data);
+
+    // Activity log
+    addLogEntry(topic, data);
+  }
+
+  function classifyLayer(topic) {
+    if (topic.startsWith('sentinel/sensors/')) return 'sensor';
+    if (topic.includes('narrative')) return 'narrative';
+    if (topic.startsWith('sentinel/context/')) return 'context';
+    if (topic.startsWith('sentinel/identity/')) return 'identity';
+    if (topic.startsWith('sentinel/system/')) return 'system';
+    return 'unknown';
+  }
+
+  // ── Radar ──────────────────────────────────────────────────────
+  let radarMsgTimes = [];
+
+  function updateRadar(d) {
+    const now = Date.now();
+    radarMsgTimes.push(now);
+    radarMsgTimes = radarMsgTimes.filter(t => now - t < 5000);
+    const rate = (radarMsgTimes.length / 5).toFixed(1);
+
+    // SensorReading wraps data in .reading
+    const r = d.reading || d;
+    const targets = r.targets || [];
+    const targetCount = r.target_count || (Array.isArray(targets) ? targets.length : 0);
+    const conf = d.confidence || r.confidence || '—';
+
+    setText('radar-targets', targetCount);
+    setText('radar-confidence', typeof conf === 'number' ? conf.toFixed(2) : conf);
+    setText('radar-rate', `${rate} Hz`);
+    setBadge('radar-badge', 'Live', 'badge-live');
+
+    // Draw targets on canvas
+    drawRadarTargets(Array.isArray(targets) ? targets : []);
+  }
+
+  function drawRadarTargets(targets) {
+    const canvas = document.getElementById('radar-canvas');
+    // Clear old targets
+    canvas.querySelectorAll('.radar-target, .radar-label').forEach(el => el.remove());
+
+    const W = canvas.clientWidth;
+    const H = canvas.clientHeight;
+
+    targets.forEach((t, i) => {
+      // LD2450: x is lateral (mm), y is distance (mm)
+      // Map to canvas: x centered, y from bottom
+      const x_mm = t.x_mm || t.x || 0;
+      const y_mm = t.y_mm || t.y || t.distance_mm || t.dist || 1000;
+
+      // Normalize: assume room is ~6m wide, 6m deep
+      const px = W/2 + (x_mm / 3000) * (W/2);
+      const py = H - (y_mm / 6000) * H;
+
+      const dot = document.createElement('div');
+      dot.className = 'radar-target';
+      dot.style.left = `${Math.max(10, Math.min(W-10, px))}px`;
+      dot.style.top = `${Math.max(10, Math.min(H-10, py))}px`;
+      canvas.appendChild(dot);
+
+      const label = document.createElement('div');
+      label.className = 'radar-label';
+      label.textContent = `T${i+1}: ${(y_mm/1000).toFixed(1)}m`;
+      label.style.left = dot.style.left;
+      label.style.top = dot.style.top;
+      canvas.appendChild(label);
+    });
+  }
+
+  // ── Environment / VOC ──────────────────────────────────────────
+  function updateVoc(d) {
+    // SensorReading wraps data in .reading
+    const r = d.reading || d;
+    // Dual temperature display
+    const tc = r.temperature_c || r.temp_c;
+    const tf = r.temperature_f;
+    if (tc != null && tf != null) {
+      setText('voc-temp', tc.toFixed(1) + '°C / ' + tf.toFixed(1) + '°F');
+    } else if (tc != null) {
+      const calcF = (tc * 9/5 + 32).toFixed(1);
+      setText('voc-temp', tc.toFixed(1) + '°C / ' + calcF + '°F');
+    } else {
+      setText('voc-temp', '—');
+    }
+
+    setText('voc-humidity', fmt(r.humidity_pct || r.humidity, '%', 1));
+    setText('voc-pressure', fmt(r.pressure_hpa || r.pressure, ' hPa', 0));
+    setText('voc-gas', fmt(r.gas_resistance_ohms || r.gas_ohms, ' Ω', 0));
+
+    // Simple air quality estimate from gas resistance
+    const gas = r.gas_resistance_ohms || r.gas_ohms || 0;
+    if (gas > 100000) setText('voc-aq', 'Good');
+    else if (gas > 50000) setText('voc-aq', 'Moderate');
+    else if (gas > 20000) setText('voc-aq', 'Poor');
+    else setText('voc-aq', gas > 0 ? 'Very Poor' : '—');
+
+    // Warmup indicator
+    const warmupRow = document.getElementById('voc-warmup-row');
+    if (r.warming_up) {
+      warmupRow.style.display = '';
+      setBadge('voc-badge', 'Warming Up', 'badge-stale');
+    } else {
+      warmupRow.style.display = 'none';
+      setBadge('voc-badge', 'Live', 'badge-live');
+    }
+  }
+
+  // ── EMRF Intelligence ─────────────────────────────────────────
+  const emrfEventLog = [];  // keep last 20 events
+  const MAX_EMRF_EVENTS = 20;
+
+  function updateEmrf(d) {
+    const r = d.reading || d;
+    const known = r.known_count || 0;
+    const infra = r.infra_count || 0;
+    const unknown = r.unknown_count || 0;
+    const present = r.present_total || (known + infra + unknown);
+    const tracked = r.tracked_total || present;
+
+    setText('emrf-scan', r.scan_number || '—');
+    setText('emrf-tracked', `${present} / ${tracked}`);
+    setText('emrf-known', known);
+    setText('emrf-infra', infra);
+    setText('emrf-unknown', unknown);
+
+    // ── Per-person presence with proximity & signal ──────────────
+    const personsDiv = document.getElementById('emrf-persons');
+    if (personsDiv && r.persons) {
+      let html = '';
+      for (const [pid, p] of Object.entries(r.persons)) {
+        const name = p.name || pid;
+        const dist = p.closest_distance_m != null ? `~${p.closest_distance_m}m` : '—';
+        const proxColor = proximityColor(p.closest_proximity);
+        const status = p.status || 'present';
+        const dur = formatDuration(p.duration_sec || 0);
+        const zconf = p.zone_confidence != null ? `${Math.round(p.zone_confidence * 100)}%` : '—';
+
+        html += `<div class="kv-row">
+          <span class="kv-key" style="color:#4fc3f7;font-weight:600;">${esc(name)}</span>
+          <span class="kv-val" style="color:${proxColor};">${esc(status)} · ${esc(dist)}</span>
+        </div>`;
+
+        // Device details
+        const devices = p.devices || [];
+        for (const dev of devices) {
+          const arrow = dev.trend === 'approaching' ? '\u2191' : dev.trend === 'receding' ? '\u2193' : '\u2022';
+          const trendColor = dev.trend === 'approaching' ? 'var(--green)' : dev.trend === 'receding' ? 'var(--red)' : 'var(--text-dim)';
+          html += `<div class="kv-row" style="padding-left:14px;">
+            <span class="kv-key" style="font-size:11px;opacity:0.8;">${esc(dev.label || '?')} ${dev.rssi || '?'}dBm</span>
+            <span class="kv-val" style="font-size:11px;color:${trendColor};">${arrow} ${esc(dev.proximity || '?')} (${dur})</span>
+          </div>`;
+        }
+      }
+      if (!html) html = '<div style="color:var(--text-dim);font-size:11px;">No known persons detected</div>';
+      personsDiv.innerHTML = html;
+    }
+
+    // ── Unknown devices with threat assessment ───────────────────
+    const unknownsSection = document.getElementById('emrf-unknowns-section');
+    const unknownsDiv = document.getElementById('emrf-unknowns');
+    const unknowns = r.unknowns || [];
+    if (unknownsDiv) {
+      if (unknowns.length > 0) {
+        unknownsSection.style.display = '';
+        let html = '';
+        for (const u of unknowns.slice(0, 8)) {
+          const threatColor = u.threat_level === 'high' ? 'var(--red)' :
+                              u.threat_level === 'medium' ? 'var(--amber)' :
+                              u.threat_level === 'low' ? 'var(--text-dim)' : 'var(--text-dim)';
+          const dist = u.distance_m != null && u.distance_m < 100 ? `~${u.distance_m}m` : '—';
+          const vendor = u.vendor || 'Unknown';
+          const mac4 = u.mac ? u.mac.slice(-5) : '??';
+          const dur = formatDuration(u.session_duration || 0);
+          html += `<div class="kv-row">
+            <span class="kv-key" style="font-size:11px;">${esc(vendor)} (${esc(mac4)})</span>
+            <span class="kv-val" style="font-size:11px;color:${threatColor};">${esc(u.threat_level || '?')} · ${esc(dist)} · ${dur}</span>
+          </div>`;
+        }
+        unknownsDiv.innerHTML = html;
+      } else {
+        unknownsSection.style.display = 'none';
+      }
+    }
+
+    // ── Infrastructure summary ───────────────────────────────────
+    const infraDiv = document.getElementById('emrf-infrastructure');
+    if (infraDiv && r.infrastructure) {
+      let html = '';
+      for (const [cat, info] of Object.entries(r.infrastructure)) {
+        html += `<div class="kv-row">
+          <span class="kv-key" style="color:var(--amber);text-transform:capitalize;">${cat.replace('_', ' ')}</span>
+          <span class="kv-val" style="color:var(--amber);font-size:12px;">${info.count} — ${(info.devices || []).slice(0, 3).join(', ')}</span>
+        </div>`;
+      }
+      infraDiv.innerHTML = html;
+    }
+
+    // ── Intelligence narrative ────────────────────────────────────
+    const intelDiv = document.getElementById('emrf-intelligence');
+    if (intelDiv && r.intelligence) {
+      intelDiv.textContent = r.intelligence;
+    }
+
+    // ── Events ───────────────────────────────────────────────────
+    const events = r.events || [];
+    if (events.length > 0) {
+      for (const ev of events) {
+        emrfEventLog.unshift(ev);
+      }
+      while (emrfEventLog.length > MAX_EMRF_EVENTS) emrfEventLog.pop();
+
+      const evSection = document.getElementById('emrf-events-section');
+      const evDiv = document.getElementById('emrf-events');
+      if (evDiv && emrfEventLog.length > 0) {
+        evSection.style.display = '';
+        let html = '';
+        for (const ev of emrfEventLog.slice(0, 10)) {
+          const evColor = ev.event_type === 'arrival' ? 'var(--green)' :
+                          ev.event_type === 'departure' ? 'var(--amber)' :
+                          ev.event_type === 'new_device' ? 'var(--red)' : 'var(--text-dim)';
+          const time = ev.timestamp ? new Date(ev.timestamp * 1000).toLocaleTimeString('en-US', {hour12:false}) : '';
+          html += `<div class="kv-row">
+            <span class="kv-key" style="font-size:10px;color:${evColor};min-width:70px;">${time} ${esc(ev.event_type || '')}</span>
+            <span class="kv-val" style="font-size:10px;color:var(--text);">${esc(ev.description || '')}</span>
+          </div>`;
+        }
+        evDiv.innerHTML = html;
+      }
+    }
+
+    setBadge('emrf-badge', 'Live', 'badge-live');
+  }
+
+  // ── EMRF Helper Functions ─────────────────────────────────────
+  function proximityColor(prox) {
+    const colors = {
+      'immediate': 'var(--green)',
+      'near': '#4fc3f7',
+      'room': 'var(--cyan)',
+      'adjacent': 'var(--amber)',
+      'far': 'var(--text-dim)',
+      'edge': '#555',
+    };
+    return colors[prox] || 'var(--text)';
+  }
+
+  function formatDuration(sec) {
+    if (!sec || sec < 0) return '0s';
+    if (sec < 60) return Math.round(sec) + 's';
+    if (sec < 3600) return Math.round(sec / 60) + 'm';
+    const h = Math.floor(sec / 3600);
+    const m = Math.round((sec % 3600) / 60);
+    return h + 'h ' + m + 'm';
+  }
+
+  function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+  }
+
+  function addEmrfEvent(ev) {
+    // Handle events arriving on dedicated topics (not embedded in scan)
+    emrfEventLog.unshift(ev);
+    while (emrfEventLog.length > MAX_EMRF_EVENTS) emrfEventLog.pop();
+    const evSection = document.getElementById('emrf-events-section');
+    const evDiv = document.getElementById('emrf-events');
+    if (evDiv && evSection) {
+      evSection.style.display = '';
+      let html = '';
+      for (const e of emrfEventLog.slice(0, 10)) {
+        const evColor = e.event_type === 'arrival' ? 'var(--green)' :
+                        e.event_type === 'departure' ? 'var(--amber)' :
+                        e.event_type === 'new_device' ? 'var(--red)' : 'var(--text-dim)';
+        const time = e.timestamp ? new Date(e.timestamp * 1000).toLocaleTimeString('en-US', {hour12:false}) : '';
+        html += `<div class="kv-row">
+          <span class="kv-key" style="font-size:10px;color:${evColor};min-width:70px;">${time} ${esc(e.event_type || '')}</span>
+          <span class="kv-val" style="font-size:10px;color:var(--text);">${esc(e.description || '')}</span>
+        </div>`;
+      }
+      evDiv.innerHTML = html;
+    }
+  }
+
+  // ── Acoustic ───────────────────────────────────────────────────
+  function updateAcoustic(d) {
+    // SensorReading wraps data in .reading
+    const r = d.reading || d;
+    setText('acoustic-rms', fmt(r.rms_db, ' dB', 1));
+    setText('acoustic-peak', fmt(r.peak_db, ' dB', 1));
+    setText('acoustic-impulsive', r.impulsive ? 'YES' : 'No');
+    setBadge('acoustic-badge', 'Live', 'badge-live');
+  }
+
+  // ── Node Health ────────────────────────────────────────────────
+  function updateHealth(d, topic) {
+    const nodeMatch = topic.match(/system\/([^/]+)\/health/);
+    const nodeId = nodeMatch ? nodeMatch[1] : '—';
+
+    setText('health-node', nodeId);
+    setText('health-uptime', formatUptime(d.uptime_sec || d.uptime_s || d.uptime || 0));
+    setText('health-heap', fmt(d.free_heap_bytes || d.heap_free || d.heap_free_bytes, ' B', 0));
+    setText('health-rssi', fmt(d.wifi_rssi || d.rssi, ' dBm', 0));
+    setText('health-reconn', d.mqtt_reconnects || d.reconnects || 0);
+    setBadge('health-badge', 'Live', 'badge-live');
+  }
+
+  // ── Narrative ──────────────────────────────────────────────────
+  function updateNarrative(d) {
+    const text = d.narrative_summary || d.summary || d.narrative || JSON.stringify(d, null, 2);
+    document.getElementById('narrative-text').innerHTML = text;
+    setBadge('narrative-badge', 'Live', 'badge-live');
+  }
+
+  // ── Occupancy ──────────────────────────────────────────────────
+  function updateOccupancy(d, topic) {
+    const zoneMatch = topic.match(/context\/([^/]+)\/occupancy/);
+    if (!zoneMatch) return;
+    const zone = zoneMatch[1];
+    const el = document.getElementById(`occ-${zone}`);
+    if (el) {
+      const names = (d.occupants || []).filter(n => !n.startsWith('unknown_'));
+      const count = d.occupant_count || d.count || 0;
+      const conf = d.confidence != null ? d.confidence : 0;
+      if (!d.occupied) {
+        el.textContent = '';  // vacant = empty
+      } else if (names.length > 0) {
+        const extra = count - names.length;
+        el.textContent = names.join(', ') + (extra > 0 ? ` +${extra}` : '') + ` (${Math.round(conf * 100)}%)`;
+      } else {
+        el.textContent = `\u25CF ${count}`;  // dot + body count
+      }
+    }
+    setBadge('context-badge', 'Live', 'badge-live');
+  }
+
+  // ── Brain Status ───────────────────────────────────────────────
+  function updateBrainStatus(d) {
+    // If brain is publishing status, the narrative panel should reflect it
+    if (d.tier) {
+      setBadge('narrative-badge', `Tier ${d.tier}`, 'badge-live');
+    }
+  }
+
+  // ── Thermal ────────────────────────────────────────────────────────
+  // Snapshot URL — camera adapter serves JPEGs on port 8089 of the Pi
+  // Camera adapter runs on <broker-host> — always use its IP for snapshots
+  const SNAPSHOT_HOST = '<broker-ip>';  // <broker-host> — camera adapter runs there
+  const THERMAL_SNAPSHOT_URL = `http://${SNAPSHOT_HOST}:8089/snapshot/thermal.jpg`;
+  const CAMERA_SNAPSHOT_URL = `http://${SNAPSHOT_HOST}:8089/snapshot/camera.jpg`;
+
+  function updateThermal(d) {
+    const r = d.reading || d;
+    const toF = (c) => c != null ? (c * 9/5 + 32).toFixed(1) : '—';
+    setText('thermal-max', r.max_temp_c != null ? r.max_temp_c.toFixed(1) + '\u00b0C / ' + toF(r.max_temp_c) + '\u00b0F' : '—');
+    setText('thermal-min', r.min_temp_c != null ? r.min_temp_c.toFixed(1) + '\u00b0C / ' + toF(r.min_temp_c) + '\u00b0F' : '—');
+    setText('thermal-mean', r.mean_temp_c != null ? r.mean_temp_c.toFixed(1) + '\u00b0C / ' + toF(r.mean_temp_c) + '\u00b0F' : '—');
+    setText('thermal-blobs', r.human_shaped_blobs || 0);
+
+    const spots = r.hot_spots || [];
+    if (spots.length > 0) {
+      const desc = spots.map(s => `${s.temp_c}\u00b0C`).join(', ');
+      setText('thermal-hotspots', desc);
+    } else {
+      setText('thermal-hotspots', 'None');
+    }
+
+    setBadge('thermal-badge', 'Live', 'badge-live');
+    refreshSnapshot('thermal-snapshot', THERMAL_SNAPSHOT_URL);
+  }
+
+  // ── Camera (Arducam IR) ──────────────────────────────────────────────
+  function updateCamera(d) {
+    const r = d.reading || d;
+    setText('camera-faces', r.faces_detected || 0);
+    setText('camera-persons', r.persons_detected || 0);
+    const conf = d.confidence || r.confidence || '\u2014';
+    setText('camera-confidence', typeof conf === 'number' ? conf.toFixed(2) : conf);
+
+    setBadge('camera-badge', 'Live', 'badge-live');
+    refreshSnapshot('camera-snapshot', CAMERA_SNAPSHOT_URL);
+  }
+
+  // ── Snapshot Refresh Helper ──────────────────────────────────────────
+  function refreshSnapshot(containerId, url) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    let img = container.querySelector('img');
+    if (!img) {
+      container.innerHTML = '';
+      img = document.createElement('img');
+      img.alt = containerId;
+      img.onerror = function() { console.warn('Snapshot load failed:', this.src); };
+      container.appendChild(img);
+    }
+    img.src = url + '?t=' + Date.now();
+    img.style.display = '';
+  }
+
+  // ── Activity Log ───────────────────────────────────────────────
+  const MAX_LOG = 100;
+  let logCount = 0;
+
+  function addLogEntry(topic, data) {
+    logCount++;
+    const body = document.getElementById('log-body');
+    const el = document.createElement('div');
+    el.className = 'log-entry';
+
+    const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+    const shortTopic = topic.replace('sentinel/', '');
+    const preview = typeof data === 'object' ? summarize(data) : String(data).slice(0, 80);
+
+    el.innerHTML = `<span class="log-time">${time}</span>` +
+                   `<span class="log-topic">${shortTopic}</span>` +
+                   `<span class="log-data">${preview}</span>`;
+
+    body.insertBefore(el, body.firstChild);
+
+    // Trim log
+    while (body.children.length > MAX_LOG) {
+      body.removeChild(body.lastChild);
+    }
+
+    document.getElementById('log-badge').textContent = `${logCount} messages`;
+    document.getElementById('log-badge').className = 'panel-badge badge-live';
+  }
+
+  function summarize(obj) {
+    const keys = Object.keys(obj);
+    if (keys.length <= 3) {
+      return keys.map(k => {
+        const v = obj[k];
+        if (typeof v === 'number') return `${k}:${v.toFixed ? v.toFixed(1) : v}`;
+        if (typeof v === 'string') return `${k}:${v.slice(0,20)}`;
+        if (Array.isArray(v)) return `${k}:[${v.length}]`;
+        return `${k}:{..}`;
+      }).join(' | ');
+    }
+    return `{${keys.length} fields}`;
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────
+  function setText(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  function setBadge(id, text, cls) {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = text; el.className = `panel-badge ${cls}`; }
+  }
+
+  function fmt(val, suffix, decimals) {
+    if (val == null || val === undefined) return '—';
+    const n = Number(val);
+    if (isNaN(n)) return String(val);
+    return n.toFixed(decimals) + suffix;
+  }
+
+  function formatUptime(s) {
+    if (!s) return '—';
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = Math.floor(s % 60);
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${sec}s`;
+    return `${sec}s`;
+  }
+
+  // ── Staleness Check ────────────────────────────────────────────
+  setInterval(() => {
+    const now = Date.now();
+
+    // Update message rate
+    msgCountWindow = msgCountWindow.filter(t => now - t < RATE_WINDOW);
+    const rate = (msgCountWindow.length / (RATE_WINDOW / 1000)).toFixed(1);
+    setText('msg-rate', `${rate} msg/s`);
+
+    // Check each panel for staleness
+    const checks = [
+      ['radar',    'sentinel/sensors/office/radar/raw'],
+      ['voc',      'sentinel/sensors/office/voc/raw'],
+      ['emrf',     'sentinel/sensors/office/emrf/raw'],
+      ['acoustic', 'sentinel/sensors/office/acoustic/raw'],
+      ['thermal',  'sentinel/sensors/office/thermal/raw'],
+      ['camera',   'sentinel/sensors/office/camera/raw'],
+    ];
+
+    checks.forEach(([panel, topic]) => {
+      const last = lastSeen[topic];
+      if (last && now - last > STALE_MS) {
+        setBadge(`${panel}-badge`, 'Stale', 'badge-stale');
+      }
+    });
+  }, 2000);
+
+  // ── Floorplan ────────────────────────────────────────────────────
+  // ── Floor Plan Zones ───────────────────────────────────────────
+  // Synthetic demo floor plan — generic placeholder zones, NOT a real residence.
+  // Bring your own layout: replace FP_ZONES / FP_NODES (coordinates in feet).
+  const FP_ZONES = {
+    office:         { name: 'Office', polygon: [[0,0],[12,0],[12,12],[0,12]], color: '#3b82f6' },
+    kitchen:        { name: 'Kitchen', polygon: [[14,0],[26,0],[26,12],[14,12]], color: '#f97316' },
+    dining:         { name: 'Dining', polygon: [[28,0],[40,0],[40,12],[28,12]], color: '#eab308' },
+    built_in:       { name: 'Built-In', polygon: [[42,0],[54,0],[54,12],[42,12]], color: '#78716c' },
+    family_room:    { name: 'Family Room', polygon: [[0,14],[12,14],[12,26],[0,26]], color: '#22c55e' },
+    foyer:          { name: 'Foyer', polygon: [[14,14],[26,14],[26,26],[14,26]], color: '#8b5cf6' },
+    bathroom:       { name: 'Bathroom', polygon: [[28,14],[40,14],[40,26],[28,26]], color: '#ec4899' },
+    stairs_up:      { name: 'Stairs Up', polygon: [[42,14],[54,14],[54,26],[42,26]], color: '#6366f1' },
+    stairs_down:    { name: 'Stairs Down', polygon: [[0,28],[12,28],[12,40],[0,40]], color: '#6366f1' },
+    closet:         { name: 'Closet', polygon: [[14,28],[26,28],[26,40],[14,40]], color: '#78716c' },
+    master_bedroom: { name: 'Master Bedroom', polygon: [[28,28],[40,28],[40,40],[28,40]], color: '#06b6d4' },
+    master_bath:    { name: 'Master Bath', polygon: [[42,28],[54,28],[54,40],[42,40]], color: '#14b8a6' },
+    front_porch:    { name: 'Front Porch', polygon: [[0,42],[12,42],[12,54],[0,54]], color: '#64748b' },
+    rear_porch:     { name: 'Rear Porch', polygon: [[14,42],[26,42],[26,54],[14,54]], color: '#64748b' },
+    laundry:        { name: 'Laundry', polygon: [[28,42],[40,42],[40,54],[28,54]], color: '#a855f7' },
+    rear_stairs:    { name: 'Rear Stairs', polygon: [[42,42],[54,42],[54,54],[42,54]], color: '#a78bfa' },
+    garage:         { name: 'Garage', polygon: [[0,56],[12,56],[12,68],[0,68]], color: '#475569' },
+  };
+
+  const FP_NODES = {
+    'node-01': { zone: 'office', pos_ft: [6, 6], facing_deg: 180, color: '#06b6d4' },
+    'node-02': { zone: 'dining', pos_ft: [34, 6], facing_deg: 180, color: '#22c55e' },
+    'node-03': { zone: 'family_room', pos_ft: [6, 20], facing_deg: 180, color: '#f59e0b' },
+    'node-04': { zone: 'master_bedroom', pos_ft: [34, 34], facing_deg: 180, color: '#ef4444' },
+  };
+
+  const FP_ZONE_NODE = {};
+  for (const [nid, n] of Object.entries(FP_NODES)) FP_ZONE_NODE[n.zone] = nid;
+
+  const fpCanvas = document.getElementById('floorplan-canvas');
+  const fpCtx = fpCanvas.getContext('2d');
+  let fpW = 0, fpH = 0, fpScale = 1, fpOffX = 0, fpOffY = 0;
+  const FP_PAD = 40;
+  const fpRadar = {};
+  const fpOccupancy = {};
+
+  function fpBounds() {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const z of Object.values(FP_ZONES)) {
+      for (const [x, y] of z.polygon) {
+        if (x < minX) minX = x; if (y < minY) minY = y;
+        if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+      }
+    }
+    return { minX, minY, maxX, maxY };
+  }
+
+  function fpResize() {
+    const wrap = fpCanvas.parentElement;
+    const dpr = window.devicePixelRatio || 1;
+    fpW = wrap.clientWidth; fpH = wrap.clientHeight;
+    fpCanvas.width = fpW * dpr; fpCanvas.height = fpH * dpr;
+    fpCanvas.style.width = fpW + 'px'; fpCanvas.style.height = fpH + 'px';
+    fpCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const b = fpBounds();
+    const spanX = b.maxX - b.minX, spanY = b.maxY - b.minY;
+    fpScale = Math.min((fpW - FP_PAD * 2) / spanX, (fpH - FP_PAD * 2) / spanY);
+    fpOffX = FP_PAD + b.maxX * fpScale + (fpW - FP_PAD * 2 - spanX * fpScale) / 2;
+    fpOffY = FP_PAD - b.minY * fpScale + (fpH - FP_PAD * 2 - spanY * fpScale) / 2;
+  }
+
+  function fpToCanvas(x_ft, y_ft) {
+    return [-x_ft * fpScale + fpOffX, y_ft * fpScale + fpOffY];
+  }
+
+  function fpDraw() {
+    fpCtx.clearRect(0, 0, fpW, fpH);
+    for (const [zid, zone] of Object.entries(FP_ZONES)) {
+      const pts = zone.polygon.map(([x, y]) => fpToCanvas(x, y));
+      const occ = fpOccupancy[zid];
+      const hasTargets = (fpRadar[zid] || []).length > 0;
+      const isOccupied = occ && (occ.occupied || occ.count > 0);
+      fpCtx.beginPath();
+      pts.forEach(([x, y], i) => i === 0 ? fpCtx.moveTo(x, y) : fpCtx.lineTo(x, y));
+      fpCtx.closePath();
+      fpCtx.fillStyle = isOccupied ? 'rgba(34,197,94,0.15)' : hasTargets ? 'rgba(6,182,212,0.12)' : 'rgba(255,255,255,0.03)';
+      fpCtx.fill();
+      fpCtx.beginPath();
+      pts.forEach(([x, y], i) => i === 0 ? fpCtx.moveTo(x, y) : fpCtx.lineTo(x, y));
+      fpCtx.closePath();
+      fpCtx.strokeStyle = zone.color + '88'; fpCtx.lineWidth = 1.5; fpCtx.stroke();
+      const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+      const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+      fpCtx.font = '600 11px "SF Mono","Cascadia Code",monospace';
+      fpCtx.fillStyle = zone.color + 'cc'; fpCtx.textAlign = 'center'; fpCtx.textBaseline = 'middle';
+      fpCtx.fillText(zone.name, cx, cy - 7);
+      if (occ && isOccupied) {
+        fpCtx.font = '500 9px monospace';
+        fpCtx.fillStyle = '#22c55e';
+        if (occ.occupants && occ.occupants.length > 0) {
+          const extra = occ.count - occ.occupants.length;
+          const conf = occ.confidence != null ? ` ${Math.round(occ.confidence * 100)}%` : '';
+          fpCtx.fillText(occ.occupants.join(', ') + (extra > 0 ? ` +${extra}` : '') + conf, cx, cy + 7);
+        } else {
+          // Unidentified body — dot
+          fpCtx.fillText('\u25CF ' + occ.count, cx, cy + 7);
+        }
+      }
+    }
+    for (const [nid, node] of Object.entries(FP_NODES)) {
+      const [nx, ny] = fpToCanvas(node.pos_ft[0], node.pos_ft[1]);
+      fpCtx.beginPath();
+      fpCtx.moveTo(nx, ny - 5); fpCtx.lineTo(nx + 5, ny); fpCtx.lineTo(nx, ny + 5); fpCtx.lineTo(nx - 5, ny);
+      fpCtx.closePath();
+      fpCtx.fillStyle = '#3b82f680'; fpCtx.fill();
+      fpCtx.strokeStyle = '#3b82f6'; fpCtx.lineWidth = 1; fpCtx.stroke();
+      fpCtx.font = '500 8px monospace'; fpCtx.fillStyle = '#64748b';
+      fpCtx.textAlign = 'center'; fpCtx.fillText(nid, nx, ny - 9);
+    }
+    for (const [zid, targets] of Object.entries(fpRadar)) {
+      if (!targets || !targets.length) continue;
+      const nodeId = FP_ZONE_NODE[zid];
+      const node = nodeId ? FP_NODES[nodeId] : null;
+      if (!node) continue;
+      for (const t of targets) {
+        const [px, py] = fpToCanvas(t.x_ft, t.y_ft);
+        fpCtx.beginPath(); fpCtx.arc(px, py, 10, 0, Math.PI * 2);
+        fpCtx.fillStyle = (node.color) + '25'; fpCtx.fill();
+        fpCtx.beginPath(); fpCtx.arc(px, py, 5, 0, Math.PI * 2);
+        fpCtx.fillStyle = node.color; fpCtx.fill();
+        fpCtx.strokeStyle = '#fff'; fpCtx.lineWidth = 1; fpCtx.stroke();
+        if (Math.abs(t.speed) > 5) {
+          fpCtx.beginPath(); fpCtx.arc(px, py, 7, 0, Math.PI * 2);
+          fpCtx.strokeStyle = Math.abs(t.speed) > 30 ? '#ef4444' : '#f59e0b';
+          fpCtx.lineWidth = 1.5; fpCtx.stroke();
+        }
+        const [nx, ny] = fpToCanvas(node.pos_ft[0], node.pos_ft[1]);
+        fpCtx.beginPath(); fpCtx.moveTo(nx, ny); fpCtx.lineTo(px, py);
+        fpCtx.strokeStyle = node.color + '30'; fpCtx.lineWidth = 1; fpCtx.stroke();
+      }
+    }
+    requestAnimationFrame(fpDraw);
+  }
+
+  function fpUpdateRadar(topic, data) {
+    const m = topic.match(/^sentinel\/sensors\/(\w+)\/radar\/raw$/);
+    if (!m) return;
+    const zone = m[1]; const nodeId = FP_ZONE_NODE[zone];
+    const node = nodeId ? FP_NODES[nodeId] : null;
+    if (!node) return;
+    const r = data.reading || data;
+    const targets = r.targets || [];
+    if (!Array.isArray(targets)) return;
+    const theta = (node.facing_deg || 180) * Math.PI / 180;
+    const cosT = Math.cos(theta), sinT = Math.sin(theta);
+    fpRadar[zone] = targets.map(t => {
+      const x_mm = t.x_mm || t.x || 0;
+      const y_mm = t.y_mm || t.y || t.distance_mm || t.dist || 1000;
+      const speed = t.speed_cms || t.speed_mms || t.speed || 0;
+      const xFt = x_mm / 304.8, yFt = y_mm / 304.8;
+      return {
+        x_ft: node.pos_ft[0] + (xFt * cosT - yFt * sinT),
+        y_ft: node.pos_ft[1] + (xFt * sinT + yFt * cosT),
+        speed,
+      };
+    });
+  }
+
+  function fpUpdateOccupancy(topic, data) {
+    const m = topic.match(/context\/(\w+)\/occupancy/);
+    if (!m) return;
+    const names = (data.occupants || []).filter(n => !n.startsWith('unknown_'));
+    fpOccupancy[m[1]] = {
+      occupied: !!data.occupied,
+      count: data.occupant_count || data.count || 0,
+      occupants: names,
+      confidence: data.confidence || 0,
+    };
+  }
+
+  window.addEventListener('resize', fpResize);
+  fpResize();
+  requestAnimationFrame(fpDraw);
+
+  // ── Init ───────────────────────────────────────────────────────
+  connect();
+
+})();
+</script>
+</body>
+</html>
